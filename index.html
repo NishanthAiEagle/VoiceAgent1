@@ -1,994 +1,254 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BistroBot - AI Restaurant Voice Host</title>
-  <!-- Tailwind CSS CDN -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bistro Voice Host</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- FontAwesome Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Google Fonts: Playfair Display for Luxury Restaurant Header & Inter for modern UI -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-            serif: ['Cinzel', 'serif'],
-          },
-          colors: {
-            gold: {
-              300: '#FDE047',
-              400: '#EAB308',
-              500: '#D97706',
-              600: '#B45309',
-            },
-            charcoal: {
-              800: '#1e2024',
-              900: '#121417',
-              950: '#0a0b0d',
-            }
-          }
-        }
-      }
-    }
-  </script>
-
   <style>
-    /* Glowing orb pulses and audio animations */
     @keyframes pulse-ring {
       0% { transform: scale(0.95); opacity: 0.8; }
       50% { transform: scale(1.15); opacity: 0.3; }
       100% { transform: scale(0.95); opacity: 0.8; }
     }
-
-    @keyframes soundwave {
-      0%, 100% { height: 6px; }
-      50% { height: 32px; }
-    }
-
-    .orb-glow {
-      box-shadow: 0 0 50px rgba(217, 119, 6, 0.35), inset 0 0 25px rgba(234, 179, 8, 0.4);
-    }
-
-    .orb-glow-listening {
-      box-shadow: 0 0 65px rgba(239, 68, 68, 0.5), inset 0 0 30px rgba(248, 113, 113, 0.4);
-    }
-
-    .orb-glow-speaking {
-      box-shadow: 0 0 65px rgba(16, 185, 129, 0.5), inset 0 0 30px rgba(52, 211, 153, 0.4);
-    }
-
-    .wave-bar {
-      animation: soundwave 1.2s infinite ease-in-out;
-    }
-    .wave-bar:nth-child(2) { animation-delay: 0.15s; }
-    .wave-bar:nth-child(3) { animation-delay: 0.3s; }
-    .wave-bar:nth-child(4) { animation-delay: 0.45s; }
-    .wave-bar:nth-child(5) { animation-delay: 0.2s; }
-    .wave-bar:nth-child(6) { animation-delay: 0.35s; }
-
-    /* Custom scrollbar */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #121417;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #2a2e36;
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #3f4552;
+    .pulsing-ring {
+      animation: pulse-ring 2s infinite ease-in-out;
     }
   </style>
 </head>
+<body class="bg-slate-950 text-slate-100 flex flex-col items-center justify-between min-h-screen p-6 font-sans select-none">
 
-<body class="bg-charcoal-950 text-neutral-200 min-h-screen flex flex-col font-sans antialiased overflow-x-hidden selection:bg-amber-500 selection:text-black">
-
-  <!-- Top Navigation Bar -->
-  <header class="w-full border-b border-neutral-800/80 bg-charcoal-900/90 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-    <div class="flex items-center space-x-3">
-      <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-600 to-yellow-400 flex items-center justify-center shadow-lg shadow-amber-900/30">
-        <i class="fa-solid fa-utensils text-charcoal-950 text-lg"></i>
-      </div>
-      <div>
-        <h1 class="font-serif font-bold text-lg tracking-wide text-white flex items-center gap-2">
-          The Golden Fork
-          <span class="text-[10px] font-sans tracking-wider uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">AI Host</span>
-        </h1>
-        <p class="text-xs text-neutral-400">Voice reservations & dining assistant</p>
-      </div>
+  <!-- Header -->
+  <header class="text-center pt-6">
+    <div class="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-semibold mb-3">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      Live Voice Host
     </div>
-
-    <!-- Quick action buttons -->
-    <div class="flex items-center space-x-2">
-      <button id="view-reservations-btn" class="px-3 py-1.5 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 text-xs font-medium text-neutral-200 transition flex items-center gap-2 border border-neutral-700/60 shadow-sm">
-        <i class="fa-solid fa-calendar-check text-amber-400"></i>
-        <span class="hidden sm:inline">Bookings</span>
-        <span id="reservation-badge" class="px-1.5 py-0.2 bg-amber-500 text-charcoal-950 text-[10px] rounded-full font-bold">0</span>
-      </button>
-
-      <button id="menu-modal-btn" class="px-3 py-1.5 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 text-xs font-medium text-neutral-200 transition flex items-center gap-2 border border-neutral-700/60 shadow-sm">
-        <i class="fa-solid fa-book-open text-amber-400"></i>
-        <span class="hidden sm:inline">Menu</span>
-      </button>
-
-      <button id="open-settings-btn" class="p-2 rounded-lg bg-neutral-800/90 hover:bg-neutral-700 text-neutral-300 hover:text-white transition border border-neutral-700/60 shadow-sm" title="Configure API key">
-        <i class="fa-solid fa-gear"></i>
-      </button>
-    </div>
+    <h1 class="text-3xl font-extrabold text-slate-100 tracking-tight">The Spice Bistro</h1>
+    <p class="text-sm text-slate-400 mt-1">Ask for dish recommendations, spice levels, or table reservations.</p>
   </header>
 
-  <main class="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-    
-    <!-- LEFT PANEL: Voice Visualizer & Direct Control (5 cols on lg) -->
-    <section class="lg:col-span-5 flex flex-col items-center justify-center p-6 bg-charcoal-900/60 border border-neutral-800/90 rounded-2xl backdrop-blur-md shadow-xl relative overflow-hidden">
-      <!-- Ambient Background lighting decoration -->
-      <div class="absolute -top-24 -left-24 w-48 h-48 bg-amber-600/10 rounded-full blur-3xl pointer-events-none"></div>
-      <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"></div>
+  <!-- Interactive Mic & Visualizer -->
+  <main class="flex flex-col items-center w-full max-w-sm my-auto">
+    <div class="relative flex items-center justify-center">
+      <!-- Animated backdrop glow ring -->
+      <div id="glowRing" class="absolute w-44 h-44 rounded-full bg-amber-500/20 blur-xl transition-all duration-500"></div>
 
-      <!-- Mode indicator chip -->
-      <div class="mb-5 flex items-center gap-2 bg-charcoal-950/80 px-3 py-1.5 rounded-full border border-neutral-800 text-xs">
-        <span id="mode-dot" class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span>
-        <span id="mode-text" class="text-neutral-300 font-medium">BistroBot Online</span>
-        <span id="mock-badge" class="ml-1 text-[10px] uppercase font-bold text-amber-400 bg-amber-950/60 border border-amber-800 px-1.5 py-0.5 rounded">Free Mock</span>
-      </div>
+      <!-- Main Orb Button -->
+      <button 
+        id="micBtn" 
+        class="relative z-10 w-32 h-32 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none"
+        aria-label="Tap to speak"
+      >
+        <span id="micIcon">🎙️</span>
+      </button>
+    </div>
 
-      <!-- Pulsing Orb Visualizer -->
-      <div class="relative my-4 flex items-center justify-center">
-        <!-- Pulse ring 1 -->
-        <div id="orb-ring-1" class="absolute w-44 h-44 rounded-full border border-amber-500/20 transition-all duration-700"></div>
-        <div id="orb-ring-2" class="absolute w-52 h-52 rounded-full border border-amber-500/10 transition-all duration-700"></div>
+    <!-- Status indicator -->
+    <p id="status" class="text-xs uppercase tracking-widest text-slate-400 mt-8 font-semibold transition-colors">
+      Tap the mic to talk
+    </p>
 
-        <!-- Central Interactive Orb -->
-        <button id="mic-toggle-btn" class="relative z-10 w-36 h-36 rounded-full bg-gradient-to-b from-charcoal-800 to-charcoal-900 border-2 border-amber-500/40 orb-glow flex flex-col items-center justify-center cursor-pointer transition-all duration-300 transform hover:scale-105 active:scale-95 group focus:outline-none focus:ring-2 focus:ring-amber-400">
-          <div id="orb-icon-container" class="text-amber-400 text-3xl mb-1 group-hover:text-amber-300 transition-colors">
-            <i id="orb-icon" class="fa-solid fa-microphone"></i>
-          </div>
-          <span id="orb-caption" class="text-[11px] uppercase tracking-wider font-semibold text-neutral-300">Tap to Talk</span>
-          
-          <!-- Soundwaves inside orb when listening/speaking -->
-          <div id="wave-container" class="hidden flex items-center space-x-1.5 mt-2 h-4">
-            <div class="w-1 bg-amber-400 rounded-full wave-bar"></div>
-            <div class="w-1 bg-amber-400 rounded-full wave-bar"></div>
-            <div class="w-1 bg-amber-400 rounded-full wave-bar"></div>
-            <div class="w-1 bg-amber-400 rounded-full wave-bar"></div>
-            <div class="w-1 bg-amber-400 rounded-full wave-bar"></div>
-          </div>
-        </button>
-      </div>
-
-      <!-- State Status Caption -->
-      <div class="mt-4 text-center">
-        <p id="agent-state-label" class="text-sm font-semibold text-amber-300 tracking-wide">Ready & Waiting</p>
-        <p id="agent-state-sub" class="text-xs text-neutral-400 mt-1 max-w-xs">
-          Tap the orb or use the text box to ask for recommendations, hours, or table bookings.
-        </p>
-      </div>
-
-      <!-- Quick Prompt Suggestions Pills -->
-      <div class="w-full mt-6 pt-5 border-t border-neutral-800/80">
-        <p class="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-          <i class="fa-regular fa-lightbulb text-amber-400"></i> Try asking:
-        </p>
-        <div class="flex flex-wrap gap-1.5 text-xs">
-          <button class="quick-chip px-2.5 py-1 rounded-full bg-neutral-800 hover:bg-amber-500/20 hover:text-amber-300 hover:border-amber-500/40 text-neutral-300 border border-neutral-700/60 transition text-left">
-            "What vegan options do you have?"
-          </button>
-          <button class="quick-chip px-2.5 py-1 rounded-full bg-neutral-800 hover:bg-amber-500/20 hover:text-amber-300 hover:border-amber-500/40 text-neutral-300 border border-neutral-700/60 transition text-left">
-            "Book a table for 4 at 7:30 PM"
-          </button>
-          <button class="quick-chip px-2.5 py-1 rounded-full bg-neutral-800 hover:bg-amber-500/20 hover:text-amber-300 hover:border-amber-500/40 text-neutral-300 border border-neutral-700/60 transition text-left">
-            "What are your opening hours?"
-          </button>
-        </div>
-      </div>
-
-      <!-- Voice Mute / Replay Audio Control Bar -->
-      <div class="mt-5 flex items-center justify-between w-full text-xs text-neutral-400 px-1">
-        <div class="flex items-center gap-2">
-          <label class="relative inline-flex items-center cursor-pointer">
-            <input type="checkbox" id="voice-reply-toggle" class="sr-only peer" checked>
-            <div class="w-8 h-4 bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500"></div>
-          </label>
-          <span class="text-[11px]">Speech Output</span>
-        </div>
-        <button id="stop-speech-btn" class="text-neutral-400 hover:text-red-400 text-xs flex items-center gap-1 transition">
-          <i class="fa-solid fa-volume-xmark"></i> Stop audio
-        </button>
-      </div>
-    </section>
-
-    <!-- RIGHT PANEL: Live Chat Transcript & Input (7 cols on lg) -->
-    <section class="lg:col-span-7 flex flex-col h-[580px] bg-charcoal-900/60 border border-neutral-800/90 rounded-2xl backdrop-blur-md shadow-xl overflow-hidden">
-      <!-- Chat Header -->
-      <div class="px-5 py-3 border-b border-neutral-800 flex items-center justify-between bg-charcoal-900/80">
-        <div class="flex items-center gap-2">
-          <i class="fa-solid fa-comments text-amber-400 text-sm"></i>
-          <span class="text-xs font-semibold uppercase tracking-wider text-neutral-300">Live Transcript</span>
-        </div>
-        <button id="clear-chat-btn" class="text-neutral-400 hover:text-neutral-200 text-xs transition flex items-center gap-1">
-          <i class="fa-regular fa-trash-can"></i> Clear
-        </button>
-      </div>
-
-      <!-- Chat Bubble Messages Container -->
-      <div id="chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3.5 scroll-smooth">
-        <!-- Welcome Host Message -->
-        <div class="flex items-start space-x-3 max-w-[88%]">
-          <div class="w-8 h-8 rounded-full bg-amber-600 flex-shrink-0 flex items-center justify-center text-xs text-white">
-            <i class="fa-solid fa-utensils"></i>
-          </div>
-          <div class="bg-neutral-800/90 border border-neutral-700/60 rounded-2xl rounded-tl-none p-3.5 text-xs sm:text-sm text-neutral-200 shadow-sm leading-relaxed">
-            <p class="font-medium text-amber-400 mb-1">BistroBot Host</p>
-            Good evening and welcome to The Golden Fork! I can help you explore our menu, discuss dietary preferences, or book a table. How may I assist you today?
-          </div>
-        </div>
-      </div>
-
-      <!-- User Live Speech Preview (Interim speech display) -->
-      <div id="live-speech-preview" class="hidden px-4 py-1.5 bg-amber-950/40 border-t border-amber-800/30 text-xs text-amber-300 italic flex items-center gap-2">
-        <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
-        <span id="speech-preview-text">Listening...</span>
-      </div>
-
-      <!-- Text Input & Voice Trigger Bar -->
-      <form id="text-input-form" class="p-3 border-t border-neutral-800 bg-charcoal-900/90 flex items-center gap-2">
-        <input 
-          type="text" 
-          id="chat-input-text" 
-          placeholder="Ask BistroBot or type your reservation..." 
-          class="flex-1 bg-neutral-950/80 border border-neutral-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-amber-500 transition placeholder:text-neutral-500"
-          autocomplete="off"
-        >
-        <button 
-          type="submit" 
-          class="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-charcoal-950 font-bold text-sm transition flex items-center justify-center shadow-md active:scale-95">
-          <i class="fa-solid fa-paper-plane"></i>
-        </button>
-      </form>
-    </section>
-
+    <!-- Live Conversation Output Box -->
+    <div 
+      id="conversationBox" 
+      class="mt-4 p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 w-full text-sm text-slate-200 min-h-[110px] flex items-center justify-center text-center shadow-inner leading-relaxed transition-all"
+    >
+      "Do you have vegan curries?" or "Reserve a table for 4 tonight at 8 PM"
+    </div>
   </main>
 
-  <!-- 1. Reservations Drawer Modal -->
-  <div id="reservations-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-charcoal-900 border border-neutral-700 w-full max-w-lg rounded-2xl shadow-2xl p-6 relative max-h-[85vh] flex flex-col">
-      <div class="flex items-center justify-between pb-4 border-b border-neutral-800">
-        <h3 class="font-serif text-lg font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-calendar-check text-amber-400"></i> Confirmed Bookings
-        </h3>
-        <button id="close-res-modal" class="text-neutral-400 hover:text-white p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-
-      <div id="reservations-list" class="flex-1 overflow-y-auto py-4 space-y-3">
-        <!-- Populated via JavaScript -->
-        <p class="text-sm text-neutral-400 italic text-center py-8">No tables booked yet. Speak to BistroBot to make your first reservation!</p>
-      </div>
-
-      <div class="pt-3 border-t border-neutral-800 flex justify-end">
-        <button id="clear-reservations-btn" class="text-xs text-red-400 hover:text-red-300 font-medium px-3 py-1.5 transition">
-          Clear All Bookings
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 2. Restaurant Menu Modal -->
-  <div id="menu-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-charcoal-900 border border-neutral-700 w-full max-w-2xl rounded-2xl shadow-2xl p-6 relative max-h-[85vh] flex flex-col">
-      <div class="flex items-center justify-between pb-4 border-b border-neutral-800">
-        <div>
-          <h3 class="font-serif text-xl font-bold text-amber-300">The Golden Fork Menu</h3>
-          <p class="text-xs text-neutral-400">Opening Hours: 5:00 PM – 11:00 PM Daily</p>
-        </div>
-        <button id="close-menu-modal" class="text-neutral-400 hover:text-white p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-
-      <div class="flex-1 overflow-y-auto py-4 space-y-5 text-sm">
-        <!-- Starters -->
-        <div>
-          <h4 class="font-semibold text-amber-400 border-b border-neutral-800 pb-1 mb-2 text-xs uppercase tracking-wider">Starters & Appetizers</h4>
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-800">
-              <div class="flex justify-between font-medium text-white"><span>Truffle Fries</span> <span class="text-amber-400">$12</span></div>
-              <p class="text-xs text-neutral-400 mt-1">Hand-cut russets, white truffle oil, grated aged parmesan, rosemary aioli.</p>
-            </div>
-            <div class="bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-800">
-              <div class="flex justify-between font-medium text-white"><span>Heirloom Bruschetta</span> <span class="text-amber-400">$10</span></div>
-              <p class="text-xs text-neutral-400 mt-1">Toasted artisan sourdough, balsamic reduction, basil & roasted garlic.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mains -->
-        <div>
-          <h4 class="font-semibold text-amber-400 border-b border-neutral-800 pb-1 mb-2 text-xs uppercase tracking-wider">Signature Mains</h4>
-          <div class="space-y-2.5">
-            <div class="bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-800">
-              <div class="flex justify-between font-medium text-white">
-                <span>Wild Mushroom Risotto <span class="ml-2 text-[10px] bg-emerald-950 border border-emerald-700 text-emerald-300 px-1.5 py-0.5 rounded">Vegan</span></span> 
-                <span class="text-amber-400">$24</span>
-              </div>
-              <p class="text-xs text-neutral-400 mt-1">Arborio rice, chanterelles, porcini broth, dairy-free cashew emulsion.</p>
-            </div>
-
-            <div class="bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-800">
-              <div class="flex justify-between font-medium text-white">
-                <span>Prime Grilled Ribeye (12oz)</span> 
-                <span class="text-amber-400">$36</span>
-              </div>
-              <p class="text-xs text-neutral-400 mt-1">USDA Prime beef, black garlic butter, asparagus, charred shallot mash.</p>
-            </div>
-
-            <div class="bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-800">
-              <div class="flex justify-between font-medium text-white">
-                <span>Penne Primavera <span class="ml-2 text-[10px] bg-sky-950 border border-sky-700 text-sky-300 px-1.5 py-0.5 rounded">Gluten-Free</span></span> 
-                <span class="text-amber-400">$22</span>
-              </div>
-              <p class="text-xs text-neutral-400 mt-1">Artisan gluten-free penne, charred zucchini, cherry tomatoes, pesto.</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Desserts -->
-        <div>
-          <h4 class="font-semibold text-amber-400 border-b border-neutral-800 pb-1 mb-2 text-xs uppercase tracking-wider">Desserts</h4>
-          <div class="bg-neutral-800/40 p-2.5 rounded-lg border border-neutral-800">
-            <div class="flex justify-between font-medium text-white"><span>Classic Venetian Tiramisu</span> <span class="text-amber-400">$10</span></div>
-            <p class="text-xs text-neutral-400 mt-1">Espresso-soaked ladyfingers, mascarpone cream, Dutch cocoa powder.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 3. Settings & API Key Modal -->
-  <div id="settings-modal" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm hidden items-center justify-center p-4">
-    <div class="bg-charcoal-900 border border-neutral-700 w-full max-w-md rounded-2xl shadow-2xl p-6 relative">
-      <div class="flex items-center justify-between pb-4 border-b border-neutral-800">
-        <h3 class="font-serif text-lg font-bold text-white flex items-center gap-2">
-          <i class="fa-solid fa-sliders text-amber-400"></i> Settings & Gemini API
-        </h3>
-        <button id="close-settings-modal" class="text-neutral-400 hover:text-white p-1">
-          <i class="fa-solid fa-xmark text-lg"></i>
-        </button>
-      </div>
-
-      <div class="py-4 space-y-4 text-xs">
-        <div>
-          <label class="block text-neutral-300 font-semibold mb-1.5">Google Gemini API Key (Optional)</label>
-          <input 
-            type="password" 
-            id="api-key-input" 
-            placeholder="AIzaSy..." 
-            class="w-full bg-neutral-950 border border-neutral-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-amber-500 font-mono"
-          >
-          <p class="text-neutral-400 mt-1 text-[11px]">
-            Leave empty to use the <strong>built-in instant simulation mode ($0 Cost)</strong>. If provided, queries connect to real Gemini API.
-          </p>
-        </div>
-
-        <div class="pt-2 border-t border-neutral-800">
-          <label class="block text-neutral-300 font-semibold mb-1">Voice Agent Voice Pitch & Speed</label>
-          <div class="flex gap-4 mt-2">
-            <div class="flex-1">
-              <span class="text-neutral-400 text-[10px]">Speed: <span id="rate-val">1.0x</span></span>
-              <input type="range" id="speech-rate" min="0.7" max="1.3" step="0.1" value="1.0" class="w-full accent-amber-500">
-            </div>
-            <div class="flex-1">
-              <span class="text-neutral-400 text-[10px]">Pitch: <span id="pitch-val">1.0</span></span>
-              <input type="range" id="speech-pitch" min="0.8" max="1.2" step="0.1" value="1.0" class="w-full accent-amber-500">
-            </div>
-          </div>
-        </div>
-
-        <div class="bg-neutral-800/40 p-3 rounded-xl border border-neutral-800 text-[11px] text-neutral-400">
-          <i class="fa-solid fa-shield-halved text-amber-400 mr-1"></i> Keys are stored safely only inside your browser's <code class="text-neutral-300">localStorage</code>.
-        </div>
-      </div>
-
-      <div class="flex justify-end gap-2 pt-2 border-t border-neutral-800">
-        <button id="save-settings-btn" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-charcoal-950 font-bold rounded-xl text-xs transition">
-          Save Settings
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Footer Info -->
+  <footer class="text-xs text-slate-500 pb-2 text-center">
+    Free Cloud Hosted • Powered by Gemini 2.5 Flash
+  </footer>
 
   <script>
-    // BistroBot Core State
-    const state = {
-      isListening: false,
-      isSpeaking: false,
-      isThinking: false,
-      apiKey: localStorage.getItem('bistrobot_gemini_key') || '',
-      voiceReply: true,
-      speechRate: 1.0,
-      speechPitch: 1.0,
-      reservations: JSON.parse(localStorage.getItem('bistrobot_reservations') || '[]'),
-      conversationHistory: [
-        {
-          role: "model",
-          text: "Good evening and welcome to The Golden Fork! I can help you explore our menu, discuss dietary preferences, or book a table. How may I assist you today?"
-        }
-      ]
-    };
+    // ================= CONFIGURATION =================
+    const GEMINI_API_KEY = "AQ.Ab8RN6LFHxe1OInni9XaLS3FyR7GVAfYTFfNI56fvud4laUmCg";
+    const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzcLqBXShlxJKxP3M9BDbDPMT3HTZf2nrxjWip9YvdI0-cKsakzDvSJPVBvNiia0DNGDA/exec";
 
-    // DOM Elements
-    const micToggleBtn = document.getElementById('mic-toggle-btn');
-    const orbIcon = document.getElementById('orb-icon');
-    const orbCaption = document.getElementById('orb-caption');
-    const waveContainer = document.getElementById('wave-container');
-    const agentStateLabel = document.getElementById('agent-state-label');
-    const agentStateSub = document.getElementById('agent-state-sub');
-    const chatMessages = document.getElementById('chat-messages');
-    const chatInputText = document.getElementById('chat-input-text');
-    const textInputForm = document.getElementById('text-input-form');
-    const liveSpeechPreview = document.getElementById('live-speech-preview');
-    const speechPreviewText = document.getElementById('speech-preview-text');
-    const voiceReplyToggle = document.getElementById('voice-reply-toggle');
-    const stopSpeechBtn = document.getElementById('stop-speech-btn');
-    const mockBadge = document.getElementById('mock-badge');
-    const resBadge = document.getElementById('reservation-badge');
+    const RESTAURANT_KNOWLEDGE = `
+You are "Aura", the AI voice host for 'The Spice Bistro' located in Indiranagar, Bengaluru.
+Operating Hours: Mon-Sun from 12:00 PM to 11:00 PM.
 
-    // Modals
-    const settingsModal = document.getElementById('settings-modal');
-    const openSettingsBtn = document.getElementById('open-settings-btn');
-    const closeSettingsModal = document.getElementById('close-settings-modal');
-    const saveSettingsBtn = document.getElementById('save-settings-btn');
-    const apiKeyInput = document.getElementById('api-key-input');
-    const speechRate = document.getElementById('speech-rate');
-    const speechPitch = document.getElementById('speech-pitch');
-    const rateVal = document.getElementById('rate-val');
-    const pitchVal = document.getElementById('pitch-val');
+MENU & DETAILS:
+1. Paneer Tikka (₹320) - Vegetarian, Gluten-Free, Mild spice.
+2. Wild Mushroom Risotto (₹420) - Vegetarian, Gluten-Free, can be made 100% Vegan upon request.
+3. Coastal Fish Curry (₹490) - Non-Veg, Coconut & kokum gravy, Medium spice.
+4. Garlic Butter Naan (₹60) - Freshly baked flatbread.
+5. Chocolate Fondant (₹250) - Eggless dessert.
 
-    const menuModal = document.getElementById('menu-modal');
-    const menuModalBtn = document.getElementById('menu-modal-btn');
-    const closeMenuModal = document.getElementById('close-menu-modal');
+BEHAVIOR RULES:
+- Always speak concisely in 1 or 2 warm, natural sentences suitable for spoken voice.
+- When a customer wants to reserve or book a table, collect their Name, Date, Time, and Number of Guests.
+- ONLY when you have collected all booking details (Name, Date, Time, Guests), respond strictly with this JSON format and nothing else:
+  {"action":"book_table","name":"...","guests":...,"date":"...","time":"...","notes":"..."}
+`;
 
-    const resModal = document.getElementById('reservations-modal');
-    const viewResBtn = document.getElementById('view-reservations-btn');
-    const closeResModal = document.getElementById('close-res-modal');
-    const resListContainer = document.getElementById('reservations-list');
-    const clearResBtn = document.getElementById('clear-reservations-btn');
-    const clearChatBtn = document.getElementById('clear-chat-btn');
+    // ================= UI REFERENCES =================
+    const micBtn = document.getElementById("micBtn");
+    const micIcon = document.getElementById("micIcon");
+    const glowRing = document.getElementById("glowRing");
+    const statusText = document.getElementById("status");
+    const convoBox = document.getElementById("conversationBox");
 
-    // Speech Recognition Setup (Web Speech API)
+    // ================= WEB SPEECH API SETUP =================
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    let recognition = null;
-    let synth = window.speechSynthesis;
-    let currentUtterance = null;
+    let recognition;
+    let isListening = false;
 
     if (SpeechRecognition) {
       recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.lang = "en-US";
 
       recognition.onstart = () => {
-        setAgentState('listening');
-        liveSpeechPreview.classList.remove('hidden');
-        speechPreviewText.textContent = "Listening to your voice...";
+        isListening = true;
+        micIcon.innerText = "⏳";
+        glowRing.classList.add("pulsing-ring", "bg-amber-400/40");
+        statusText.innerText = "Listening to you...";
+        statusText.classList.remove("text-slate-400", "text-red-400");
+        statusText.classList.add("text-amber-400");
       };
 
-      recognition.onresult = (event) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-
-        if (interimTranscript) {
-          speechPreviewText.textContent = `"${interimTranscript}"`;
-        }
-
-        if (finalTranscript) {
-          liveSpeechPreview.classList.add('hidden');
-          handleUserInput(finalTranscript.trim());
-        }
+      recognition.onresult = async (event) => {
+        const userText = event.results[0][0].transcript;
+        convoBox.innerText = `"${userText}"`;
+        statusText.innerText = "Aura is thinking...";
+        statusText.classList.replace("text-amber-400", "text-blue-400");
+        await handleGeminiQuery(userText);
       };
 
-      recognition.onerror = (event) => {
-        console.warn('Speech recognition warning/error:', event.error);
-        liveSpeechPreview.classList.add('hidden');
-        setAgentState('idle');
+      recognition.onerror = (e) => {
+        console.error("Speech Recognition Error:", e);
+        resetUI();
+        if (e.error === "not-allowed") {
+          statusText.innerText = "Microphone permission blocked";
+          statusText.classList.add("text-red-400");
+        } else {
+          statusText.innerText = "Didn't catch that. Tap to try again.";
+        }
       };
 
       recognition.onend = () => {
-        liveSpeechPreview.classList.add('hidden');
-        if (!state.isThinking && !state.isSpeaking) {
-          setAgentState('idle');
+        isListening = false;
+        if (statusText.innerText.includes("Listening")) {
+          resetUI();
+        }
+      };
+
+      micBtn.onclick = () => {
+        if (isListening) {
+          recognition.stop();
+          resetUI();
+        } else {
+          try {
+            recognition.start();
+          } catch (err) {
+            recognition.stop();
+          }
         }
       };
     } else {
-      console.warn("Web Speech API not fully supported on this browser. Text input remains available.");
+      statusText.innerText = "Please open this in Chrome or Edge for voice support.";
+      statusText.classList.add("text-red-400");
+      micBtn.disabled = true;
     }
 
-    // Toggle Voice Listening
-    function toggleListening() {
-      if (!SpeechRecognition) {
-        appendMessage('system', 'Voice input is not supported in this browser. Please type in the chat input.');
-        return;
-      }
-
-      if (state.isSpeaking) {
-        stopSpeech();
-      }
-
-      if (state.isListening) {
-        try { recognition.stop(); } catch (e) {}
-        setAgentState('idle');
-      } else {
-        try {
-          recognition.start();
-        } catch (e) {
-          console.error(e);
-        }
-      }
+    function resetUI() {
+      micIcon.innerText = "🎙️";
+      glowRing.classList.remove("pulsing-ring", "bg-amber-400/40");
+      statusText.innerText = "Tap the mic to talk";
+      statusText.className = "text-xs uppercase tracking-widest text-slate-400 mt-8 font-semibold transition-colors";
     }
 
-    function setAgentState(status) {
-      state.isListening = (status === 'listening');
-      state.isThinking = (status === 'thinking');
-      state.isSpeaking = (status === 'speaking');
-
-      // Reset classes
-      micToggleBtn.classList.remove('orb-glow', 'orb-glow-listening', 'orb-glow-speaking');
-      waveContainer.classList.add('hidden');
-      orbIcon.className = 'fa-solid';
-
-      if (status === 'listening') {
-        micToggleBtn.classList.add('orb-glow-listening');
-        waveContainer.classList.remove('hidden');
-        orbIcon.classList.add('fa-microphone-lines', 'text-red-400');
-        orbCaption.textContent = "Listening";
-        agentStateLabel.textContent = "Listening to you...";
-        agentStateLabel.className = "text-sm font-semibold text-red-400 tracking-wide";
-        agentStateSub.textContent = "Speak clearly into your microphone...";
-      } else if (status === 'thinking') {
-        micToggleBtn.classList.add('orb-glow');
-        orbIcon.classList.add('fa-brain', 'text-amber-400', 'animate-bounce');
-        orbCaption.textContent = "Thinking";
-        agentStateLabel.textContent = "BistroBot is thinking...";
-        agentStateLabel.className = "text-sm font-semibold text-amber-300 tracking-wide";
-        agentStateSub.textContent = "Consulting kitchen menu & table schedule...";
-      } else if (status === 'speaking') {
-        micToggleBtn.classList.add('orb-glow-speaking');
-        waveContainer.classList.remove('hidden');
-        orbIcon.classList.add('fa-volume-high', 'text-emerald-400');
-        orbCaption.textContent = "Speaking";
-        agentStateLabel.textContent = "BistroBot is speaking";
-        agentStateLabel.className = "text-sm font-semibold text-emerald-400 tracking-wide";
-        agentStateSub.textContent = "Listen to the response or tap orb to interrupt.";
-      } else {
-        // Idle
-        micToggleBtn.classList.add('orb-glow');
-        orbIcon.classList.add('fa-microphone', 'text-amber-400');
-        orbCaption.textContent = "Tap to Talk";
-        agentStateLabel.textContent = "Ready & Waiting";
-        agentStateLabel.className = "text-sm font-semibold text-amber-300 tracking-wide";
-        agentStateSub.textContent = "Tap the orb or use the text box below.";
-      }
-    }
-
-    // Text to Speech playback
-    function speakText(text) {
-      if (!state.voiceReply || !synth) return;
-
-      synth.cancel(); // Stop any pending speech
-      setAgentState('speaking');
-
-      // Strip markdown asterisks or code formatting for clear reading
-      const cleanSpeech = text.replace(/[*#_`]/g, '').replace(/\[.*?\]/g, '');
-      currentUtterance = new SpeechSynthesisUtterance(cleanSpeech);
-      currentUtterance.rate = state.speechRate;
-      currentUtterance.pitch = state.speechPitch;
-
-      // Select natural English voice if present
-      const voices = synth.getVoices();
-      const preferredVoice = voices.find(v => (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Daniel")) && v.lang.startsWith("en"));
-      if (preferredVoice) {
-        currentUtterance.voice = preferredVoice;
-      }
-
-      currentUtterance.onend = () => {
-        setAgentState('idle');
-      };
-      currentUtterance.onerror = () => {
-        setAgentState('idle');
-      };
-
-      synth.speak(currentUtterance);
-    }
-
-    function stopSpeech() {
-      if (synth) {
-        synth.cancel();
-      }
-      setAgentState('idle');
-    }
-
-    const RESTAURANT_SYSTEM_PROMPT = `
-You are "BistroBot", the warm, sophisticated AI host and sommelier for "The Golden Fork", a luxury bistro.
-Key Information:
-- Opening Hours: 5:00 PM to 11:00 PM daily.
-- Location: 450 Grand Avenue.
-- Appetizers: Truffle Fries ($12, rosemary aioli), Heirloom Bruschetta ($10, balsamic reduction, vegan-friendly).
-- Mains: 
-  * Wild Mushroom Risotto ($24, chanterelles & cashew emulsion, strictly VEGAN).
-  * Prime Grilled Ribeye 12oz ($36, black garlic butter, asparagus).
-  * Penne Primavera ($22, GLUTEN-FREE artisan penne, charred zucchini, fresh pesto).
-- Desserts: Classic Venetian Tiramisu ($10, espresso & mascarpone).
-- Policies: We accommodate vegan, vegetarian, and gluten-free dietary needs.
-
-Your Job:
-1. Answer menu questions, prices, allergens, and pairings warmly and concisely.
-2. Assist with table reservations: Gather party size, date/day, preferred time (between 5 PM - 11 PM), and guest name.
-3. When a reservation is finalized and confirmed with sufficient info (party size, time, date or day, and name), include a structured confirmation block at the very end of your response formatted EXACTLY like this:
-BOOKING_DATA:{"name":"Guest Name","guests":4,"time":"7:30 PM","date":"Tonight"}
-
-Keep responses conversational, hospitable, and under 3 sentences unless detailing dishes. Speak as a host.
-`;
-
-    async function handleUserInput(userInput) {
-      if (!userInput) return;
-
-      appendMessage('user', userInput);
-      chatInputText.value = '';
-      setAgentState('thinking');
-
-      // Check if Gemini API key exists
-      if (state.apiKey && state.apiKey.trim().length > 10) {
-        await queryGeminiAPI(userInput);
-      } else {
-        // Fallback to Instant Intelligent Mock ($0 Zero-cost simulation)
-        simulateLocalAgent(userInput);
-      }
-    }
-
-    // Direct Gemini API Client Fetch
-    async function queryGeminiAPI(userQuery) {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${state.apiKey}`;
-
+    // ================= GEMINI INFERENCE & BOOKING =================
+    async function handleGeminiQuery(query) {
       try {
-        const payload = {
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: `${RESTAURANT_SYSTEM_PROMPT}\n\nCustomer says: "${userQuery}"` }]
-            }
-          ]
-        };
-
-        const response = await fetch(endpoint, {
+        const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": GEMINI_API_KEY
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: `${RESTAURANT_KNOWLEDGE}\n\nCustomer: ${query}` }
+                ]
+              }
+            ]
+          })
         });
 
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.status}`);
+        const result = await response.json();
+
+        if (result.error) {
+          throw new Error(result.error.message || "API Error");
         }
 
-        const data = await response.json();
-        const replyText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I apologize, could you repeat that for me?";
-        processAgentResponse(replyText);
+        const reply = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Could you please rephrase that?";
 
-      } catch (err) {
-        console.error("Gemini API call failed, falling back to local simulator:", err);
-        simulateLocalAgent(userQuery);
-      }
-    }
-
-    function simulateLocalAgent(input) {
-      setTimeout(() => {
-        const lower = input.toLowerCase();
-        let reply = "";
-        let bookingData = null;
-
-        if (lower.includes("menu") || lower.includes("dish") || lower.includes("food") || lower.includes("offer")) {
-          reply = "We offer lovely appetizers like our Truffle Fries ($12) and Heirloom Bruschetta ($10), followed by our Wild Mushroom Risotto ($24) and Prime Ribeye ($36). Would you like to hear about our vegan or gluten-free selections?";
-        } else if (lower.includes("vegan") || lower.includes("vegetarian") || lower.includes("plant")) {
-          reply = "Our standout vegan entree is the Wild Mushroom Risotto ($24), prepared with chanterelles and a rich dairy-free cashew emulsion. Our Bruschetta is also 100% plant-based!";
-        } else if (lower.includes("gluten") || lower.includes("celiac") || lower.includes("gf")) {
-          reply = "We take allergies very seriously! Our Penne Primavera ($22) is crafted with certified artisan gluten-free pasta, charred zucchini, cherry tomatoes, and basil pesto.";
-        } else if (lower.includes("hours") || lower.includes("open") || lower.includes("time") || lower.includes("close")) {
-          reply = "The Golden Fork opens our dining room every evening from 5:00 PM to 11:00 PM.";
-        } else if (lower.includes("book") || lower.includes("reserve") || lower.includes("table") || lower.includes("reservation")) {
-          // Check for party numbers and times
-          const guestsMatch = lower.match(/\b([1-9]|10)\b/) || ["2"];
-          const guests = parseInt(guestsMatch[0], 10) || 2;
-          const timeMatch = lower.match(/(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i) || ["7:30 PM"];
-          const time = timeMatch[0].includes(":") ? timeMatch[0] : `${timeMatch[0]}:00 PM`;
-
-          reply = `Delightful! I have reserved a prime table for ${guests} guests at ${time}. We look forward to hosting you at The Golden Fork!`;
-          bookingData = {
-            name: "Guest",
-            guests: guests,
-            time: time,
-            date: "Today"
-          };
-        } else if (lower.includes("thank") || lower.includes("bye") || lower.includes("good night")) {
-          reply = "It is our absolute pleasure. Have a wonderful evening and we hope to welcome you soon!";
+        // Check if the response contains table booking JSON
+        if (reply.startsWith("{") && reply.includes("book_table")) {
+          const booking = JSON.parse(reply);
+          await pushReservationToSheets(booking);
+          const confirmation = `All set! Table for ${booking.guests} reserved for ${booking.name} at ${booking.time}.`;
+          convoBox.innerText = confirmation;
+          readAloud(confirmation);
         } else {
-          reply = "Certainly! At The Golden Fork, we strive to make every evening memorable. I can reserve a table for you or share details on our chef's daily specialties.";
+          convoBox.innerText = reply;
+          readAloud(reply);
         }
-
-        if (bookingData) {
-          reply += `\nBOOKING_DATA:${JSON.stringify(bookingData)}`;
-        }
-
-        processAgentResponse(reply);
-      }, 700);
-    }
-
-    function processAgentResponse(rawText) {
-      let cleanText = rawText;
-      let bookingObject = null;
-
-      // Extract BOOKING_DATA tag if present
-      const match = rawText.match(/BOOKING_DATA:(\{.*?\})/);
-      if (match) {
-        try {
-          bookingObject = JSON.parse(match[1]);
-          cleanText = rawText.replace(/BOOKING_DATA:\{.*?\}/, '').trim();
-        } catch (e) {
-          console.warn("Could not parse booking json", e);
-        }
-      }
-
-      appendMessage('agent', cleanText, bookingObject);
-      speakText(cleanText);
-
-      if (bookingObject) {
-        saveBooking(bookingObject);
+      } catch (err) {
+        console.error("Gemini request failed:", err);
+        convoBox.innerText = `Error: ${err.message || "Failed to reach Gemini API."}`;
+        statusText.innerText = "Connection Issue";
+        statusText.classList.add("text-red-400");
+        resetUI();
       }
     }
 
-    function appendMessage(sender, text, bookingData = null) {
-      const wrapper = document.createElement('div');
-      wrapper.className = `flex items-start space-x-3 max-w-[88%] ${sender === 'user' ? 'ml-auto flex-row-reverse space-x-reverse' : ''}`;
-
-      let iconHtml = sender === 'user' 
-        ? `<div class="w-8 h-8 rounded-full bg-neutral-700 flex-shrink-0 flex items-center justify-center text-xs text-white"><i class="fa-solid fa-user"></i></div>`
-        : `<div class="w-8 h-8 rounded-full bg-amber-600 flex-shrink-0 flex items-center justify-center text-xs text-white"><i class="fa-solid fa-utensils"></i></div>`;
-
-      let bubbleBg = sender === 'user'
-        ? 'bg-amber-500 text-charcoal-950 font-medium rounded-2xl rounded-tr-none shadow-md'
-        : 'bg-neutral-800/90 border border-neutral-700/60 rounded-2xl rounded-tl-none text-neutral-200 shadow-sm';
-
-      let contentHtml = `
-        <div class="${bubbleBg} p-3.5 text-xs sm:text-sm leading-relaxed">
-          ${sender === 'agent' ? '<p class="font-semibold text-amber-400 text-xs mb-1">BistroBot Host</p>' : ''}
-          <p>${escapeHtml(text)}</p>
-          ${bookingData ? renderBookingCardHtml(bookingData) : ''}
-        </div>
-      `;
-
-      wrapper.innerHTML = iconHtml + contentHtml;
-      chatMessages.appendChild(wrapper);
-      chatMessages.scrollTop = chatMessages.scrollHeight;
+    // ================= LOG TO GOOGLE SHEETS =================
+    async function pushReservationToSheets(details) {
+      statusText.innerText = "Saving to reservation log...";
+      try {
+        await fetch(APPS_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(details)
+        });
+      } catch (err) {
+        console.error("Sheets webhook error:", err);
+      }
     }
 
-    function renderBookingCardHtml(data) {
-      return `
-        <div class="mt-3 bg-charcoal-950/80 border border-amber-500/40 rounded-xl p-3 text-xs text-neutral-200">
-          <div class="flex items-center justify-between pb-1.5 border-b border-neutral-800 mb-2">
-            <span class="font-serif font-bold text-amber-300 uppercase tracking-wide text-[11px]">Table Reserved</span>
-            <span class="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded font-bold">Confirmed</span>
-          </div>
-          <div class="grid grid-cols-2 gap-1.5 text-[11px]">
-            <div><span class="text-neutral-400">Party:</span> <strong class="text-white">${data.guests || 2} Guests</strong></div>
-            <div><span class="text-neutral-400">Time:</span> <strong class="text-white">${data.time || '7:30 PM'}</strong></div>
-            <div><span class="text-neutral-400">Date:</span> <strong class="text-white">${data.date || 'Today'}</strong></div>
-            <div><span class="text-neutral-400">Name:</span> <strong class="text-white">${data.name || 'Guest'}</strong></div>
-          </div>
-        </div>
-      `;
-    }
-
-    function escapeHtml(string) {
-      const div = document.createElement('div');
-      div.innerText = string;
-      return div.innerHTML;
-    }
-
-    function saveBooking(booking) {
-      const record = {
-        id: Date.now(),
-        name: booking.name || 'Valued Guest',
-        guests: booking.guests || 2,
-        time: booking.time || '7:30 PM',
-        date: booking.date || 'Tonight',
-        createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-
-      state.reservations.unshift(record);
-      localStorage.setItem('bistrobot_reservations', JSON.stringify(state.reservations));
-      updateReservationCount();
-    }
-
-    function updateReservationCount() {
-      resBadge.textContent = state.reservations.length;
-      renderReservationsList();
-    }
-
-    function renderReservationsList() {
-      if (state.reservations.length === 0) {
-        resListContainer.innerHTML = `<p class="text-sm text-neutral-400 italic text-center py-8">No tables booked yet. Speak to BistroBot to make your first reservation!</p>`;
+    // ================= SPEECH SYNTHESIS (TTS) =================
+    function readAloud(text) {
+      if (!window.speechSynthesis) {
+        resetUI();
         return;
       }
+      window.speechSynthesis.cancel();
+      const speech = new SpeechSynthesisUtterance(text);
+      speech.rate = 1.0;
+      speech.pitch = 1.0;
 
-      resListContainer.innerHTML = state.reservations.map(res => `
-        <div class="bg-neutral-800/60 border border-neutral-700/60 p-3 rounded-xl flex items-center justify-between">
-          <div>
-            <h5 class="font-bold text-white text-sm flex items-center gap-2">
-              ${escapeHtml(res.name)} 
-              <span class="text-[10px] text-amber-400 font-normal bg-amber-950/60 border border-amber-800 px-1.5 py-0.2 rounded">${res.guests} Guests</span>
-            </h5>
-            <p class="text-xs text-neutral-400 mt-0.5">
-              <i class="fa-regular fa-clock text-amber-400 mr-1"></i> ${escapeHtml(res.time)} • ${escapeHtml(res.date)}
-            </p>
-          </div>
-          <button onclick="removeReservation(${res.id})" class="text-neutral-500 hover:text-red-400 text-xs p-1.5 transition" title="Cancel booking">
-            <i class="fa-regular fa-trash-can"></i>
-          </button>
-        </div>
-      `).join('');
+      speech.onstart = () => {
+        statusText.innerText = "Aura is speaking...";
+        statusText.classList.replace("text-blue-400", "text-emerald-400");
+      };
+
+      speech.onend = () => {
+        resetUI();
+      };
+
+      window.speechSynthesis.speak(speech);
     }
-
-    window.removeReservation = function(id) {
-      state.reservations = state.reservations.filter(r => r.id !== id);
-      localStorage.setItem('bistrobot_reservations', JSON.stringify(state.reservations));
-      updateReservationCount();
-    };
-
-    // Form submission
-    textInputForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const val = chatInputText.value.trim();
-      if (val) {
-        handleUserInput(val);
-      }
-    });
-
-    // Mic click
-    micToggleBtn.addEventListener('click', toggleListening);
-
-    // Stop audio
-    stopSpeechBtn.addEventListener('click', stopSpeech);
-
-    // Voice toggle
-    voiceReplyToggle.addEventListener('change', (e) => {
-      state.voiceReply = e.target.checked;
-      if (!state.voiceReply) stopSpeech();
-    });
-
-    // Suggestion chips
-    document.querySelectorAll('.quick-chip').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const text = btn.textContent.replace(/"/g, '').trim();
-        handleUserInput(text);
-      });
-    });
-
-    // Clear transcript
-    clearChatBtn.addEventListener('click', () => {
-      chatMessages.innerHTML = '';
-      appendMessage('agent', 'The Golden Fork transcript reset. How can I assist with your dining plans?');
-    });
-
-    // Modal controls
-    openSettingsBtn.addEventListener('click', () => {
-      apiKeyInput.value = state.apiKey;
-      speechRate.value = state.speechRate;
-      speechPitch.value = state.speechPitch;
-      rateVal.textContent = `${state.speechRate}x`;
-      pitchVal.textContent = state.speechPitch;
-      settingsModal.classList.remove('hidden');
-      settingsModal.classList.add('flex');
-    });
-
-    closeSettingsModal.addEventListener('click', () => {
-      settingsModal.classList.add('hidden');
-      settingsModal.classList.remove('flex');
-    });
-
-    saveSettingsBtn.addEventListener('click', () => {
-      state.apiKey = apiKeyInput.value.trim();
-      state.speechRate = parseFloat(speechRate.value);
-      state.speechPitch = parseFloat(speechPitch.value);
-      localStorage.setItem('bistrobot_gemini_key', state.apiKey);
-
-      if (state.apiKey) {
-        mockBadge.textContent = "Gemini Flash";
-        mockBadge.className = "ml-1 text-[10px] uppercase font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-1.5 py-0.5 rounded";
-      } else {
-        mockBadge.textContent = "Free Mock";
-        mockBadge.className = "ml-1 text-[10px] uppercase font-bold text-amber-400 bg-amber-950/60 border border-amber-800 px-1.5 py-0.5 rounded";
-      }
-
-      settingsModal.classList.add('hidden');
-      settingsModal.classList.remove('flex');
-    });
-
-    speechRate.addEventListener('input', (e) => { rateVal.textContent = `${e.target.value}x`; });
-    speechPitch.addEventListener('input', (e) => { pitchVal.textContent = e.target.value; });
-
-    // Menu modal
-    menuModalBtn.addEventListener('click', () => {
-      menuModal.classList.remove('hidden');
-      menuModal.classList.add('flex');
-    });
-    closeMenuModal.addEventListener('click', () => {
-      menuModal.classList.add('hidden');
-      menuModal.classList.remove('flex');
-    });
-
-    // Reservations modal
-    viewResBtn.addEventListener('click', () => {
-      renderReservationsList();
-      resModal.classList.remove('hidden');
-      resModal.classList.add('flex');
-    });
-    closeResModal.addEventListener('click', () => {
-      resModal.classList.add('hidden');
-      resModal.classList.remove('flex');
-    });
-
-    clearResBtn.addEventListener('click', () => {
-      state.reservations = [];
-      localStorage.setItem('bistrobot_reservations', '[]');
-      updateReservationCount();
-    });
-
-    // Close on backdrop clicks
-    window.addEventListener('click', (e) => {
-      if (e.target === settingsModal) {
-        settingsModal.classList.add('hidden');
-        settingsModal.classList.remove('flex');
-      }
-      if (e.target === menuModal) {
-        menuModal.classList.add('hidden');
-        menuModal.classList.remove('flex');
-      }
-      if (e.target === resModal) {
-        resModal.classList.add('hidden');
-        resModal.classList.remove('flex');
-      }
-    });
-
-    window.addEventListener('DOMContentLoaded', () => {
-      updateReservationCount();
-
-      if (state.apiKey) {
-        mockBadge.textContent = "Gemini Flash";
-        mockBadge.className = "ml-1 text-[10px] uppercase font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-1.5 py-0.5 rounded";
-      }
-
-      // Pre-warm browser voices
-      if (synth) {
-        synth.getVoices();
-      }
-    });
   </script>
 </body>
 </html>
