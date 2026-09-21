@@ -60,7 +60,6 @@
 
   <script>
     // ================= CONFIGURATION =================
-    // Paste your Google Apps Script Web App URL here:
     const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzcLqBXShlxJKxP3M9BDbDPMT3HTZf2nrxjWip9YvdI0-cKsakzDvSJPVBvNiia0DNGDA/exec";
 
     // Conversation state tracking
@@ -145,26 +144,37 @@
       statusText.className = "text-xs uppercase tracking-widest text-slate-400 mt-8 font-semibold transition-colors";
     }
 
-    // ================= TALK DIRECTLY TO GOOGLE SHEET =================
-    async function talkToSheetBrain(userText) {
-      try {
-        const queryUrl = `${WEBHOOK_URL}?text=${encodeURIComponent(userText)}&state=${encodeURIComponent(conversationState)}&context=${encodeURIComponent(JSON.stringify(conversationContext))}`;
-        const response = await fetch(queryUrl);
-        const data = await response.json();
+    // ================= TALK DIRECTLY TO GOOGLE SHEET (JSONP) =================
+    function talkToSheetBrain(userText) {
+      return new Promise((resolve, reject) => {
+        const callbackName = "jsonp_cb_" + Math.round(100000 * Math.random());
+        const script = document.createElement("script");
 
-        // Update state and context from sheet brain
-        conversationState = data.nextState || "idle";
-        conversationContext = data.context || {};
+        window[callbackName] = (data) => {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
 
-        convoBox.innerText = data.reply;
-        shouldAutoListen = conversationState !== "idle";
-        readAloud(data.reply);
-      } catch (err) {
-        console.error("Server connection error:", err);
-        const fallback = "I'm having trouble reaching the bistro server. Please tap again.";
-        convoBox.innerText = fallback;
-        resetUI();
-      }
+          conversationState = data.nextState || "idle";
+          conversationContext = data.context || {};
+
+          convoBox.innerText = data.reply;
+          shouldAutoListen = conversationState !== "idle";
+          readAloud(data.reply);
+          resolve(data);
+        };
+
+        script.onerror = () => {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+          convoBox.innerText = "I'm having trouble reaching the bistro server. Please tap again.";
+          resetUI();
+          reject(new Error("JSONP request failed"));
+        };
+
+        const queryUrl = `${WEBHOOK_URL}?text=${encodeURIComponent(userText)}&state=${encodeURIComponent(conversationState)}&context=${encodeURIComponent(JSON.stringify(conversationContext))}&callback=${callbackName}`;
+        script.src = queryUrl;
+        document.body.appendChild(script);
+      });
     }
 
     // ================= SPEECH SYNTHESIS (TTS) =================
