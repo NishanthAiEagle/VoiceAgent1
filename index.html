@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bistro Voice Host</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse-ring {
+      0% { transform: scale(0.95); opacity: 0.8; }
+      50% { transform: scale(1.15); opacity: 0.3; }
+      100% { transform: scale(0.95); opacity: 0.8; }
+    }
+    .pulsing-ring {
+      animation: pulse-ring 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 flex flex-col items-center justify-between min-h-screen p-6 font-sans select-none">
+
+  <!-- Header -->
+  <header class="text-center pt-6 w-full max-w-sm">
+    <div class="inline-flex items-center gap-2 px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-400 text-xs font-semibold mb-2">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+      Multilingual Voice Host
+    </div>
+    <h1 class="text-3xl font-extrabold text-slate-100 tracking-tight">The Spice Bistro</h1>
+    
+    <!-- Language Selector Dropdown -->
+    <div class="mt-3 flex justify-center items-center gap-2">
+      <label for="langSelect" class="text-xs text-slate-400 font-medium">Language:</label>
+      <select 
+        id="langSelect" 
+        class="bg-slate-900 border border-slate-700 text-amber-400 text-xs rounded-lg px-2.5 py-1 focus:ring-1 focus:ring-amber-500 focus:outline-none"
+      >
+        <option value="en" selected>English (India)</option>
+        <option value="ta">தமிழ் (Tamil)</option>
+        <option value="hi">हिन्दी (Hindi)</option>
+        <option value="ml">മലയാളം (Malayalam)</option>
+        <option value="kn">ಕನ್ನಡ (Kannada)</option>
+        <option value="te">తెలుగు (Telugu)</option>
+      </select>
+    </div>
+  </header>
+
+  <!-- Interactive Mic & Visualizer -->
+  <main class="flex flex-col items-center w-full max-w-sm my-auto">
+    <div class="relative flex items-center justify-center">
+      <div id="glowRing" class="absolute w-44 h-44 rounded-full bg-amber-500/20 blur-xl transition-all duration-500"></div>
+
+      <button 
+        id="micBtn" 
+        class="relative z-10 w-32 h-32 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all duration-300 focus:outline-none"
+        aria-label="Tap to speak"
+      >
+        <span id="micIcon">🎙️</span>
+      </button>
+    </div>
+
+    <p id="status" class="text-xs uppercase tracking-widest text-slate-400 mt-8 font-semibold transition-colors">
+      Tap the mic to talk
+    </p>
+
+    <div 
+      id="conversationBox" 
+      class="mt-4 p-5 rounded-2xl bg-slate-900/90 border border-slate-800/80 w-full text-sm text-slate-200 min-h-[110px] flex items-center justify-center text-center shadow-inner leading-relaxed transition-all"
+    >
+      Select your language and tap the mic to begin!
+    </div>
+  </main>
+
+  <footer class="text-xs text-slate-500 pb-2 text-center">
+    Free Cloud Hosted • The Spice Bistro AI
+  </footer>
+
+  <script>
+    // ================= CONFIGURATION =================
+    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbzcLqBXShlxJKxP3M9BDbDPMT3HTZf2nrxjWip9YvdI0-cKsakzDvSJPVBvNiia0DNGDA/exec";
+
+    const LOCALE_MAP = {
+      en: "en-IN",
+      ta: "ta-IN",
+      hi: "hi-IN",
+      ml: "ml-IN",
+      kn: "kn-IN",
+      te: "te-IN"
+    };
+
+    let selectedLang = "en";
+    let conversationState = "idle";
+    let conversationContext = {};
+
+    // UI Elements
+    const micBtn = document.getElementById("micBtn");
+    const micIcon = document.getElementById("micIcon");
+    const glowRing = document.getElementById("glowRing");
+    const statusText = document.getElementById("status");
+    const convoBox = document.getElementById("conversationBox");
+    const langSelect = document.getElementById("langSelect");
+
+    langSelect.addEventListener("change", (e) => {
+      selectedLang = e.target.value;
+      conversationState = "idle";
+      conversationContext = {};
+      if (recognition) {
+        recognition.lang = LOCALE_MAP[selectedLang];
+      }
+    });
+
+    // ================= WEB SPEECH API =================
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let recognition;
+    let isListening = false;
+    let shouldAutoListen = false;
+
+    if (SpeechRecognition) {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = LOCALE_MAP[selectedLang];
+
+      recognition.onstart = () => {
+        isListening = true;
+        micIcon.innerText = "⏳";
+        glowRing.classList.add("pulsing-ring", "bg-amber-400/40");
+        statusText.innerText = "Listening...";
+        statusText.className = "text-xs uppercase tracking-widest text-amber-400 mt-8 font-semibold transition-colors";
+      };
+
+      recognition.onresult = async (event) => {
+        const userText = event.results[0][0].transcript;
+        convoBox.innerText = `"${userText}"`;
+        statusText.innerText = "Processing...";
+        statusText.className = "text-xs uppercase tracking-widest text-blue-400 mt-8 font-semibold transition-colors";
+        await talkToSheetBrain(userText);
+      };
+
+      recognition.onerror = (e) => {
+        console.error("Speech Recognition Error:", e);
+        resetUI();
+        statusText.innerText = e.error === "not-allowed" ? "Microphone blocked" : "Tap mic to retry";
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        if (statusText.innerText.includes("Listening")) {
+          resetUI();
+        }
+      };
+
+      micBtn.onclick = () => {
+        if (isListening) {
+          shouldAutoListen = false;
+          recognition.stop();
+          resetUI();
+        } else {
+          startListening();
+        }
+      };
+    } else {
+      statusText.innerText = "Please use Chrome, Edge, or Safari.";
+      micBtn.disabled = true;
+    }
+
+    function startListening() {
+      if (!recognition) return;
+      recognition.lang = LOCALE_MAP[selectedLang];
+      try {
+        recognition.start();
+      } catch (err) {
+        recognition.stop();
+      }
+    }
+
+    function resetUI() {
+      micIcon.innerText = "🎙️";
+      glowRing.classList.remove("pulsing-ring", "bg-amber-400/40");
+      statusText.innerText = "Tap the mic to talk";
+      statusText.className = "text-xs uppercase tracking-widest text-slate-400 mt-8 font-semibold transition-colors";
+    }
+
+    // ================= TALK TO GOOGLE SHEETS (JSONP) =================
+    function talkToSheetBrain(userText) {
+      return new Promise((resolve, reject) => {
+        const callbackName = "jsonp_cb_" + Math.round(100000 * Math.random());
+        const script = document.createElement("script");
+
+        window[callbackName] = (data) => {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+
+          conversationState = data.nextState || "idle";
+          conversationContext = data.context || {};
+
+          convoBox.innerText = data.reply;
+          shouldAutoListen = conversationState !== "idle";
+          readAloud(data.reply);
+          resolve(data);
+        };
+
+        script.onerror = () => {
+          delete window[callbackName];
+          if (document.body.contains(script)) document.body.removeChild(script);
+          convoBox.innerText = "Server connection error. Please tap again.";
+          resetUI();
+          reject(new Error("JSONP request failed"));
+        };
+
+        const queryUrl = `${WEBHOOK_URL}?text=${encodeURIComponent(userText)}&state=${encodeURIComponent(conversationState)}&context=${encodeURIComponent(JSON.stringify(conversationContext))}&lang=${encodeURIComponent(selectedLang)}&callback=${callbackName}`;
+        script.src = queryUrl;
+        document.body.appendChild(script);
+      });
+    }
+
+    // ================= SPEECH SYNTHESIS (TTS) =================
+    function readAloud(text) {
+      if (!window.speechSynthesis) {
+        resetUI();
+        return;
+      }
+      window.speechSynthesis.cancel();
+      const speech = new SpeechSynthesisUtterance(text);
+      speech.lang = LOCALE_MAP[selectedLang];
+      speech.rate = 1.0;
+      speech.pitch = 1.0;
+
+      const voices = window.speechSynthesis.getVoices();
+      const matchedVoice = voices.find(v => v.lang === LOCALE_MAP[selectedLang] || v.lang.startsWith(selectedLang));
+      if (matchedVoice) speech.voice = matchedVoice;
+
+      speech.onstart = () => {
+        statusText.innerText = "Aura is speaking...";
+        statusText.className = "text-xs uppercase tracking-widest text-emerald-400 mt-8 font-semibold transition-colors";
+      };
+
+      speech.onend = () => {
+        resetUI();
+        if (shouldAutoListen) {
+          startListening();
+        }
+      };
+
+      window.speechSynthesis.speak(speech);
+    }
+  </script>
+</body>
+</html>
