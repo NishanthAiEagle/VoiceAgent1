@@ -95,7 +95,7 @@ RESERVATION INSTRUCTIONS:
 - When ALL 3 details (Name, Date/Time, Guests) are collected, respond strictly with this JSON and no other text:
 {"action":"book_table","name":"...","guests":...,"date":"...","time":"...","notes":"..."}`;
 
-    // Holds conversation history as simple dialog lines
+    // Holds conversation history as running dialogue
     let conversationTranscript = "";
 
     // ================= UI REFERENCES =================
@@ -190,61 +190,47 @@ RESERVATION INSTRUCTIONS:
       conversationTranscript += `\nCustomer: ${userQuery}`;
       const combinedPrompt = `${RESTAURANT_RULES}\n\nCONVERSATION HISTORY:${conversationTranscript}\nAura:`;
 
-      // Supported models with automatic fallback
-      const targetModels = [
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent",
-        "https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent"
-      ];
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [{ text: combinedPrompt }]
+              }
+            ]
+          })
+        });
 
-      let lastError = null;
-      let reply = null;
+        const result = await response.json();
 
-      for (const endpoint of targetModels) {
-        try {
-          const response = await fetch(`${endpoint}?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: combinedPrompt }] }]
-            })
-          });
-
-          const result = await response.json();
-          if (result.error) {
-            lastError = result.error.message;
-            continue; // Try next model fallback
-          }
-
-          reply = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-          if (reply) break;
-        } catch (err) {
-          lastError = err.message;
+        if (result.error) {
+          throw new Error(result.error.message || "API Error");
         }
-      }
 
-      if (!reply) {
-        console.error("Gemini Error:", lastError);
-        convoBox.innerText = `Error: ${lastError || "Could not reach Gemini"}`;
+        const reply = result.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "Could you please rephrase that?";
+
+        conversationTranscript += `\nAura: ${reply}`;
+
+        if (reply.startsWith("{") && reply.includes("book_table")) {
+          const booking = JSON.parse(reply);
+          await pushReservationToSheets(booking);
+          const confirmation = `All set! Table for ${booking.guests} reserved for ${booking.name} at ${booking.time}.`;
+          convoBox.innerText = confirmation;
+          shouldAutoListen = false;
+          readAloud(confirmation);
+        } else {
+          convoBox.innerText = reply;
+          shouldAutoListen = true;
+          readAloud(reply);
+        }
+      } catch (err) {
+        console.error("Gemini Error:", err);
+        convoBox.innerText = `Error: ${err.message}`;
         statusText.innerText = "Connection Issue";
         statusText.classList.add("text-red-400");
         resetUI();
-        return;
-      }
-
-      conversationTranscript += `\nAura: ${reply}`;
-
-      if (reply.startsWith("{") && reply.includes("book_table")) {
-        const booking = JSON.parse(reply);
-        await pushReservationToSheets(booking);
-        const confirmation = `All set! Table for ${booking.guests} reserved for ${booking.name} at ${booking.time}.`;
-        convoBox.innerText = confirmation;
-        shouldAutoListen = false;
-        readAloud(confirmation);
-      } else {
-        convoBox.innerText = reply;
-        shouldAutoListen = true;
-        readAloud(reply);
       }
     }
 
